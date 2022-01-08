@@ -10,7 +10,6 @@ def euclidean_distance(x: np.array, y: np.array) -> float:
     Returns:
         Length of the line segment connecting given points
     """
-    assert x.shape == y.shape
 
     return np.sqrt(np.sum((x - y) ** 2))
 
