@@ -1,6 +1,6 @@
 import numpy as np
 from typing import Optional, Union, Tuple
-
+from functools import reduce
 
 def euclidean_distance(x: np.array, y: np.array) -> float:
     """
@@ -48,7 +48,15 @@ def apk(actual: np.array, predicted: np.array, k: int = 10) -> float:
     Returns:
         The average precision at k over the input lists
     """
-    pass
+    precision_at_k = lambda n: len(np.intersect1d(predicted[:n], actual)) / n
+    relevant = lambda x: int(predicted[x] in actual)
+
+    # result_apk = 0
+    # for i in range(1, k+1):
+    #     result_apk += precision_at_k(i) * relevant(i-1)
+    
+    result_apk = reduce(lambda a, x: a + x, map(lambda x: precision_at_k(x+1) * relevant(x), range(k)))
+    return result_apk / k
 
 
 def mapk(actual: np.array, predicted: np.array, k: int = 10) -> float:
@@ -61,4 +69,5 @@ def mapk(actual: np.array, predicted: np.array, k: int = 10) -> float:
     Returns:
         The mean average precision at k over the input lists
     """
-    pass
+    len_u = len(actual)
+    return reduce(lambda a, x: a + x, map(lambda x: apk(actual[x], predicted[x], k), range(len_u))) / len_u
