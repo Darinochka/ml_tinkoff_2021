@@ -7,7 +7,11 @@ import preprocess
 from sklearn.feature_extraction.text import TfidfVectorizer
 import ast
 from typing import Union
+from sklearn.metrics.pairwise import cosine_similarity
+import io
+import numpy as np
 
+documents = pd.read_pickle('data')
 
 class Document:
     def __init__(self, doc):
@@ -22,7 +26,7 @@ class Document:
 
     def format(self, query):
         # возвращает пару тайтл-текст, отформатированную под запрос
-        return [self.title, self.text[:1000] + ' ...', self.url]
+        return [self.title, self.text[:300] + ' ...', self.url]
     
     def __equal__(self, other):
         return self.url == other.url
@@ -32,6 +36,9 @@ class Document:
 
     def count_word(self, word):
         return self.count_words[word]
+    
+    def __str__(self):
+        return self.url
 
 
 class Index(Sequence):
@@ -65,19 +72,7 @@ class Index(Sequence):
 
     def get_index(self):
         return self._index
-  
-def get_data(file: str):
-    df = pd.read_csv(file)
 
-    df.words_body = df.words_body.apply(ast.literal_eval)
-    df.words_title = df.words_title.apply(ast.literal_eval)
-    df.vectors_title = df.vectors_title.apply(ast.literal_eval)
-    df.vectors_body = df.vectors_body.apply(ast.literal_eval)
-
-    return df
-    
-# documents = get_data('data.csv')
-documents = pd.read_pickle('data')
 
 def get_tfidf(type_tfidf):
     dummy_fun = lambda doc: doc
@@ -90,20 +85,56 @@ def get_tfidf(type_tfidf):
 
     return tfidf
 
+def load_vectors(fname, limit):
+  fin = io.open(fname, 'r', encoding = 'utf-8', newline = '\n', errors = 'ignore')
+  n, d = map(int, fin.readline().split())
+  data = {}
+  for line in tqdm(islice(fin, limit), total = limit):
+    tokens = line.rstrip().split(' ')
+    data[tokens[0]] = np.array(list(map(float, tokens[1:])))
+  return data
+
 tfidf_body = get_tfidf('body')
 tfidf_title = get_tfidf('title') 
 index = Index(
     list(tfidf_body.vocabulary_.keys()) + list(tfidf_title.vocabulary_.keys())
 )
+vecs = load_vectors('crawl-300d-2M.vec', 200_000) 
 
 def build_index():
     # считывает сырые данные и строит индекс
     for idx in range(len(documents)):
         index.append(Document(documents.loc[idx]))
 
+def get_vectors(vector_body, vector_title):
+    dim = 300
+    zero = sum(vecs.values()) / len(vecs)
+
+    vocab_body = np.zeros((len(tfidf_body.vocabulary_.keys()), dim))
+    for key in tfidf_body.vocabulary_.keys():
+        vocab_body[tfidf_body.vocabulary_[key]] = vecs.get(key, zero)
+
+    vocab_title = np.zeros((len(tfidf_title.vocabulary_.keys()), dim))
+    for key in tfidf_title.vocabulary_.keys():
+        vocab_title[tfidf_title.vocabulary_[key]] = vecs.get(key, zero)
+    
+    return (
+        np.array(vector_body.tolist()).dot(vocab_body).tolist(),
+        np.array(vector_title.tolist()).dot(vocab_title).tolist()
+    )
+
 def score(query, document):
     # возвращает какой-то скор для пары запрос-документ
     # больше -- релевантнее
+    words = preprocess.preprocessing_text(query)
+
+    tfidf_b = tfidf_body.transform(words)
+    tfidf_t = tfidf_title.transform(words)
+
+    vector_body, vector_title = get_vectors(tfidf_b, tfidf_t)
+
+    diff_body = cosine_similarity(vector_body, tfidf_b)
+    diff_title = cosine_similarity(vector_title, tfidf_t)
 
     return random.random()
 
@@ -114,7 +145,7 @@ def retrieve(query):
     print(f"query words: {words}")
 
     candidates_inersec = set()  # кандидаты при пересечение слов
-    candidate_words = set()     # кандидаты от каждого слова
+    candidates_words = set()     # кандидаты от каждого слова
 
     for word in words:
         if candidates_inersec:
@@ -122,13 +153,13 @@ def retrieve(query):
         else:
             candidates_inersec = index[word]
 
-        candidate_words |= index[word]
+        candidates_words |= index[word]
 
     # чтобы объединить и первым поставить результат пересечений, удалим
     # из кандидатов всех слов пересечения
-    candidate_words -= candidates_inersec
-    
-    print(candidates_inersec, candidate_words)
-    print(candidates_inersec.union(candidate_words))
-    candidated_doc = index.get_docs(candidates_inersec.union(candidate_words))
+    candidates_words -= candidates_inersec
+
+    candidated_doc = index.get_docs(candidates_inersec)
+    candidated_doc += index.get_docs(candidates_words)
+
     return candidated_doc[:50]
