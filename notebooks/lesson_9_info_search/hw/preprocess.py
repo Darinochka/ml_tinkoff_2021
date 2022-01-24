@@ -51,3 +51,4 @@ def del_stopwords(sentences: list) -> list:
 
 def preprocessing_text(text: str) -> list:
     return del_stopwords(lemmatization(tokenization(sentence_segmentation(text))))
+    

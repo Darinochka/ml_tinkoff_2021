@@ -5,13 +5,15 @@ import pickle
 import pandas as pd
 import preprocess
 from sklearn.feature_extraction.text import TfidfVectorizer
+import ast
+from typing import Union
 
 
 class Document:
     def __init__(self, doc):
         # можете здесь какие-нибудь свои поля подобавлять
-        self.url = doc['url']
-        self.title = doc['title']
+        self.url = doc['issue_url']
+        self.title = doc['issue_title']
         self.text = doc['body']
         self.vector_title = doc['vectors_title']
         self.vector_body = doc['vectors_body']
@@ -20,7 +22,7 @@ class Document:
 
     def format(self, query):
         # возвращает пару тайтл-текст, отформатированную под запрос
-        return [self.title, self.text + ' ...', self.url]
+        return [self.title, self.text[:1000] + ' ...', self.url]
     
     def __equal__(self, other):
         return self.url == other.url
@@ -35,7 +37,7 @@ class Document:
 class Index(Sequence):
     def __init__(self, vocab):
         self.documents = list()
-        self.index = {word: set() for word in vocab}
+        self._index = {word: set() for word in vocab}
 
     def append(self, doc: Document):
         self.documents.append(doc)
@@ -43,18 +45,39 @@ class Index(Sequence):
 
     def update_index(self, doc):
         for word in doc.count_words:
-            self.index[word].add(len(self.documents) - 1)
+            self._index[word].add(len(self.documents) - 1)
 
     def __getitem__(self, w: str) -> set:
-        return sorted(self.index[w], key=lambda x: self.documents[x].count_word(w))
+        # return sorted(self.index[w], key=lambda x: self.documents[x].count_word(w))
+        return self._index[w]
     
     def __len__(self):
-        return len(self.index)
+        return len(self._index)
     
     def get_doc(self, idx):
         return self.documents[idx]
 
-documents = pd.read_csv('data.csv')
+    def get_docs(self, idxs: Union[list, set]):
+        docs = list()
+        for idx in idxs:
+            docs.append(self.get_doc(idx))
+        return docs
+
+    def get_index(self):
+        return self._index
+  
+def get_data(file: str):
+    df = pd.read_csv(file)
+
+    df.words_body = df.words_body.apply(ast.literal_eval)
+    df.words_title = df.words_title.apply(ast.literal_eval)
+    df.vectors_title = df.vectors_title.apply(ast.literal_eval)
+    df.vectors_body = df.vectors_body.apply(ast.literal_eval)
+
+    return df
+    
+# documents = get_data('data.csv')
+documents = pd.read_pickle('data')
 
 def get_tfidf(type_tfidf):
     dummy_fun = lambda doc: doc
@@ -82,16 +105,30 @@ def score(query, document):
     # возвращает какой-то скор для пары запрос-документ
     # больше -- релевантнее
 
-    vector_body = tfidf_body.transform(query).toarray().squeeze()
-    vector_title = tfidf_title.transform(query).toarray().squeeze()
     return random.random()
 
 def retrieve(query):
     # возвращает начальный список релевантных документов
     # (желательно, не бесконечный)
     words = preprocess.preprocessing_text(query)
-    candidates = []
-    for word in words:
-        candidates = candidates & index[word] if not candidates else index[word]
+    print(f"query words: {words}")
 
-    return candidates[:50]
+    candidates_inersec = set()  # кандидаты при пересечение слов
+    candidate_words = set()     # кандидаты от каждого слова
+
+    for word in words:
+        if candidates_inersec:
+            candidates_inersec &= index[word] 
+        else:
+            candidates_inersec = index[word]
+
+        candidate_words |= index[word]
+
+    # чтобы объединить и первым поставить результат пересечений, удалим
+    # из кандидатов всех слов пересечения
+    candidate_words -= candidates_inersec
+    
+    print(candidates_inersec, candidate_words)
+    print(candidates_inersec.union(candidate_words))
+    candidated_doc = index.get_docs(candidates_inersec.union(candidate_words))
+    return candidated_doc[:50]
