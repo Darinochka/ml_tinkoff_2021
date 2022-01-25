@@ -10,6 +10,8 @@ from typing import Union
 from sklearn.metrics.pairwise import cosine_similarity
 import io
 import numpy as np
+from itertools import islice
+
 
 documents = pd.read_pickle('data')
 
@@ -26,7 +28,7 @@ class Document:
 
     def format(self, query):
         # возвращает пару тайтл-текст, отформатированную под запрос
-        return [self.title, self.text[:300] + ' ...', self.url]
+        return [self.title, self.text[:200] + ' ...', self.url]
     
     def __equal__(self, other):
         return self.url == other.url
@@ -89,7 +91,7 @@ def load_vectors(fname, limit):
   fin = io.open(fname, 'r', encoding = 'utf-8', newline = '\n', errors = 'ignore')
   n, d = map(int, fin.readline().split())
   data = {}
-  for line in tqdm(islice(fin, limit), total = limit):
+  for line in islice(fin, limit):
     tokens = line.rstrip().split(' ')
     data[tokens[0]] = np.array(list(map(float, tokens[1:])))
   return data
@@ -100,6 +102,18 @@ index = Index(
     list(tfidf_body.vocabulary_.keys()) + list(tfidf_title.vocabulary_.keys())
 )
 vecs = load_vectors('crawl-300d-2M.vec', 200_000) 
+
+def get_vocab(tfidf):
+    dim = 300
+    zero = sum(vecs.values()) / len(vecs)
+
+    vocab = np.zeros((len(tfidf.vocabulary_.keys()), dim))
+    for key in tfidf.vocabulary_.keys():
+        vocab[tfidf.vocabulary_[key]] = vecs.get(key, zero)
+    return vocab
+
+vocab_body = get_vocab(tfidf_body)
+vocab_title = get_vocab(tfidf_title)
 
 def build_index():
     # считывает сырые данные и строит индекс
@@ -119,8 +133,8 @@ def get_vectors(vector_body, vector_title):
         vocab_title[tfidf_title.vocabulary_[key]] = vecs.get(key, zero)
     
     return (
-        np.array(vector_body.tolist()).dot(vocab_body).tolist(),
-        np.array(vector_title.tolist()).dot(vocab_title).tolist()
+        vector_body.dot(vocab_body),
+        vector_title.dot(vocab_title),
     )
 
 def score(query, document):
@@ -131,12 +145,13 @@ def score(query, document):
     tfidf_b = tfidf_body.transform(words)
     tfidf_t = tfidf_title.transform(words)
 
-    vector_body, vector_title = get_vectors(tfidf_b, tfidf_t)
+    vector_body, vector_title = tfidf_b.dot(vocab_body), tfidf_t.dot(vocab_title)
 
-    diff_body = cosine_similarity(vector_body, tfidf_b)
-    diff_title = cosine_similarity(vector_title, tfidf_t)
+    diff_body = cosine_similarity(vector_body, [document.vector_body])[0][0]
+    diff_title = cosine_similarity(vector_title, [document.vector_title])[0][0]
 
-    return random.random()
+    print(diff_body, diff_title)
+    return 0.4 * diff_body + 0.6 * diff_title
 
 def retrieve(query):
     # возвращает начальный список релевантных документов
