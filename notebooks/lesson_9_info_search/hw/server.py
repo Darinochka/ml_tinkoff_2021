@@ -19,7 +19,7 @@ def index():
         'index.html',
         time="%.2f" % (time()-start_time),
         query=query,
-        search_engine_name='Yandex',
+        search_engine_name='Dasha',
         results=results
     )
 
