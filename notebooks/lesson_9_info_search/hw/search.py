@@ -17,14 +17,13 @@ documents = pd.read_pickle('data')
 
 class Document:
     def __init__(self, doc):
-        # можете здесь какие-нибудь свои поля подобавлять
         self.url = doc['issue_url'][1:-1]
         self.title = doc['issue_title']
         self.text = doc['body']
         self.vector_title = doc['vectors_title']
         self.vector_body = doc['vectors_body']
 
-        self.count_words = Counter(doc['words_title'] + doc['words_title'])
+        self.count_words = Counter(doc['words_body'] + doc['words_title'])
 
     def format(self, query):
         words = preprocess.preprocessing_text(query)
@@ -64,8 +63,7 @@ class Index(Sequence):
             self._index[word].add(len(self.documents) - 1)
 
     def __getitem__(self, w: str) -> set:
-        # return sorted(self.index[w], key=lambda x: self.documents[x].count_word(w))
-        return self._index[w]
+        return sorted(self._index[w], key=lambda i: self.documents[i].count_words[w])
     
     def __len__(self):
         return len(self._index)
@@ -108,7 +106,7 @@ tfidf_title = get_tfidf('title')
 index = Index(
     list(tfidf_body.vocabulary_.keys()) + list(tfidf_title.vocabulary_.keys())
 )
-vecs = load_vectors('crawl-300d-2M.vec', 800_000) 
+vecs = load_vectors('crawl-300d-2M.vec', 200_000)
 
 def get_vocab(tfidf):
     dim = 300
@@ -123,39 +121,41 @@ vocab_body = get_vocab(tfidf_body)
 vocab_title = get_vocab(tfidf_title)
 
 def build_index():
-    # считывает сырые данные и строит индекс
     for idx in range(len(documents)):
         index.append(Document(documents.loc[idx]))
 
 def score(query, document):
-    # возвращает какой-то скор для пары запрос-документ
-    # больше -- релевантнее
     words = preprocess.preprocessing_text(query)
 
-    tfidf_b = tfidf_body.transform(words)
-    tfidf_t = tfidf_title.transform(words)
+    tfidf_b = tfidf_body.transform([words]).toarray().squeeze()
+    tfidf_t = tfidf_title.transform([words]).toarray().squeeze()
 
     vector_body, vector_title = tfidf_b.dot(vocab_body), tfidf_t.dot(vocab_title)
 
-    diff_body = cosine_similarity(vector_body, [document.vector_body])[0][0]
-    diff_title = cosine_similarity(vector_title, [document.vector_title])[0][0]
+    diff_body = cosine_similarity([vector_body], [document.vector_body])[0][0]
+    diff_title = cosine_similarity([vector_title], [document.vector_title])[0][0]
 
     return 0.4 * diff_body + 0.6 * diff_title
 
 def retrieve(query):
-    # количество документов на выдаче
-    n = 50 
+    n = 50                      # количество документов на выдаче
     words = preprocess.preprocessing_text(query)
+    word_n = int(n / (len(words) + 1)) # количество рекомендаций для каждого слов
+
     candidates_inersec = set()  # кандидаты при пересечение слов
     candidates_words = set()    # кандидаты от каждого слова
 
     for word in words:
-        if candidates_inersec:
-            candidates_inersec &= index[word] 
-        else:
-            candidates_inersec = index[word]
+        docs = index[word]
+        if len(candidates_inersec) == n:
+            break
 
-        candidates_words |= index[word]
+        if candidates_inersec:
+            candidates_inersec &= set(docs) 
+        else:
+            candidates_inersec = set(docs)
+
+        candidates_words |= set(docs[:word_n])
 
     # чтобы объединить и первым поставить результат пересечений, удалим
     # из кандидатов всех слов пересечения
