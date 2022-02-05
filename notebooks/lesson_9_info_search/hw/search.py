@@ -63,7 +63,7 @@ class Index(Sequence):
             self._index[word].add(len(self.documents) - 1)
 
     def __getitem__(self, w: str) -> set:
-        return sorted(self._index[w], key=lambda i: self.documents[i].count_words[w])
+        return set(sorted(self._index[w], key=lambda i: self.documents[i].count_words[w]))
     
     def __len__(self):
         return len(self._index)
@@ -140,10 +140,9 @@ def score(query, document):
 def retrieve(query):
     n = 50                      # количество документов на выдаче
     words = preprocess.preprocessing_text(query)
-    word_n = int(n / (len(words) + 1)) # количество рекомендаций для каждого слов
 
     candidates_inersec = set()  # кандидаты при пересечение слов
-    candidates_words = set()    # кандидаты от каждого слова
+    candidates_words = []    # кандидаты от каждого слова
 
     for word in words:
         docs = index[word]
@@ -151,20 +150,20 @@ def retrieve(query):
             break
 
         if candidates_inersec:
-            candidates_inersec &= set(docs) 
+            candidates_inersec &= docs
         else:
-            candidates_inersec = set(docs)
+            candidates_inersec |= docs
 
-        candidates_words |= set(docs[:word_n])
-
-    # чтобы объединить и первым поставить результат пересечений, удалим
-    # из кандидатов всех слов пересечения
-    candidates_words -= candidates_inersec
+        candidates_words.append(docs)
 
     cand_doc = list(islice(map(index.get_doc, candidates_inersec), n))
+
     if len(cand_doc) < n:
-        cand_doc += list(
-            islice(map(index.get_doc, candidates_words), n-len(cand_doc)), 
-        )
+        word_n = int((n - len(cand_doc)) / (len(words) + 1)) # количество рекомендаций для каждого слова
+        for i in range(len(candidates_words)):
+            candidates_words[i] -= candidates_inersec
+            cand_doc += list(
+                islice(map(index.get_doc, candidates_words[i]), word_n), 
+            )
 
     return cand_doc
