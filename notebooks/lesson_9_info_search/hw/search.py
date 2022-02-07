@@ -1,17 +1,14 @@
-import random
 from collections import Counter
 from collections.abc import Sequence
-import pickle
 import pandas as pd
 import preprocess
 from sklearn.feature_extraction.text import TfidfVectorizer
-import ast
 from typing import Union
 from sklearn.metrics.pairwise import cosine_similarity
 import io
 import numpy as np
 from itertools import islice
-
+import utils
 
 documents = pd.read_pickle('data')
 
@@ -157,6 +154,7 @@ def retrieve(query):
         candidates_words.append(docs)
 
     cand_doc = list(islice(map(index.get_doc, candidates_inersec), n))
+    candidates = list(candidates_inersec)[:n]
 
     if len(cand_doc) < n:
         word_n = int((n - len(cand_doc)) / (len(words) + 1)) # количество рекомендаций для каждого слова
@@ -165,5 +163,21 @@ def retrieve(query):
             cand_doc += list(
                 islice(map(index.get_doc, candidates_words[i]), word_n), 
             )
-
+            candidates += list(candidates_words[i])[:word_n]
+    
+    metrics(candidates, cand_doc, query)
     return cand_doc
+
+def metrics(candidates: list, cand_doc: list, query: str):
+    """
+    candidates неотсортированы, номера документов
+    cand_doc неотсортированы, сами документы
+    """
+    print(candidates)
+    if candidates:
+        scores = np.array([score(query, doc) for doc in cand_doc])
+        candidates = np.array(candidates)[np.argsort(scores)]
+        actual = np.arange(2000, 3050)
+
+        print("<----Average precision at K---->")
+        print(f"For query: {query} AP@k = {utils.apk(actual, candidates)}")
