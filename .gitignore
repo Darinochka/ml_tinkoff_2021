@@ -137,3 +137,4 @@ fifaeda.ipynb
 *.vec
 *.txt
 __MACOSX/
+dask-worker-space/
