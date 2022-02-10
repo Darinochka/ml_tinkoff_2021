@@ -1,6 +1,8 @@
 import re
+from nltk import  pos_tag
+from nltk import WordNetLemmatizer
 from nltk.corpus import stopwords
-import pymorphy2
+from nltk.corpus import wordnet as wn
 
 morph = pymorphy2.MorphAnalyzer()
 
@@ -12,14 +14,28 @@ def sentence_segmentation(text: str) -> list:
 def tokenization(sentences: list) -> list:
     return [re.split(r'[,:(\s\-)]*\s', s) for s in sentences]
 
-def lemmatize_sent(tokens):
-    result = []
-    for word in tokens:
-        result.append(morph.parse(word)[0].normal_form)
-    return result
+def get_wordnet_pos(treebank_tag):
+    my_switch = {
+        'J': wn.ADJ,
+        'V': wn.VERB,
+        'N': wn.NOUN,
+        'R': wn.ADV,
+    }
+    for key, item in my_switch.items():
+        if treebank_tag.startswith(key):
+            return item
+    return wn.NOUN
 
-def lemmatization(sentences):
-    return [lemmatize_sent(s) for s in sentences]
+def lemmatization(sentences: list) -> list:
+    sentences_tag  = [pos_tag(s) for s in sentences] # получаем теги слов каждого предложения
+
+    lemmatizer = WordNetLemmatizer()
+    lemm_sentences = []
+    for sent in sentences_tag:
+        pos_tagged = [(word, get_wordnet_pos(tag)) for word, tag in sent]
+        lemm_sentences.append([lemmatizer.lemmatize(word, tag) for word, tag in pos_tagged])
+
+    return lemm_sentences
 
 def del_stopwords(sentences: list) -> list:
     stop_words = set(stopwords.words('english')).union({'', ' '})

@@ -1,8 +1,6 @@
 # DASHA - информационный поиск
 
-<video width="320" height="240" controls>
-  <source src="example.mp4" type="video/mp4">
-</video>
+[![Видео примера использования]({})]({https://www.youtube.com/watch?v=qGv3UoTFwk4} "Пример использования")
 
 ## Датасет
 
