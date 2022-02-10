@@ -1,7 +1,7 @@
 # DASHA - информационный поиск
 
 
-[![Видео примера использования](https://img.youtube.com/vi/qGv3UoTFwk4/sddefault.jpg)](https://www.youtube.com/watch?v=qGv3UoTFwk4 "Everything Is AWESOME")
+[![Видео примера использования](https://img.youtube.com/vi/qGv3UoTFwk4/sddefault.jpg)](https://www.youtube.com/watch?v=qGv3UoTFwk4 "Открыть видео")
 
 ## Датасет
 
