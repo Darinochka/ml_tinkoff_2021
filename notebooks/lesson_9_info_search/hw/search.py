@@ -156,15 +156,15 @@ def retrieve(query):
     cand_doc = list(islice(map(index.get_doc, candidates_inersec), n))
     # candidates = list(candidates_inersec)[:n]
 
-    if len(cand_doc) < n:
-        word_n = int((n - len(cand_doc)) / (len(words) + 1)) # количество рекомендаций для каждого слова
+    if len(cand_doc) < n and len(words) != 0:
+        word_n = int((n - len(cand_doc)) / len(words)) # количество рекомендаций для каждого слова
         for i in range(len(candidates_words)):
             candidates_words[i] -= candidates_inersec
             cand_doc += list(
                 islice(map(index.get_doc, candidates_words[i]), word_n), 
             )
             # candidates += list(candidates_words[i])[:word_n]
-    
+
     # metrics(candidates, cand_doc, query)
     return cand_doc
 
