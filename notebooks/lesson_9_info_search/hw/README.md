@@ -1,11 +1,7 @@
 # DASHA - информационный поиск
 
-<<<<<<< HEAD
-[![Видео примера использования]({})]({https://www.youtube.com/watch?v=qGv3UoTFwk4} "Пример использования")
-=======
 
 [![Видео примера использования](https://img.youtube.com/vi/qGv3UoTFwk4/sddefault.jpg)](https://www.youtube.com/watch?v=qGv3UoTFwk4 "Everything Is AWESOME")
->>>>>>> e78b8c94fa474c8f738d821f5d9fd0410422a3ec
 
 ## Датасет
 
